@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenerativeAI, FunctionDeclaration, SchemaType } from '@google/generative-ai'
 import type { LLMProvider, LLMMessage, GenerateElementsResponse } from './types'
 import { SYSTEM_PROMPT, GENERATE_ELEMENTS_PROMPT } from './prompts'
 
@@ -8,6 +8,22 @@ const getGeminiClient = () => {
     throw new Error('GEMINI_API_KEY is not set')
   }
   return new GoogleGenerativeAI(apiKey)
+}
+
+// Define the tool for generating map elements
+const generateMapElementsTool: FunctionDeclaration = {
+  name: 'generate_map_elements',
+  description: 'Generate map elements (pins, areas, routes, arcs) to visualize locations, events, or geographic information on the map. Use this when the user asks about places, landmarks, historical events, routes, or anything that can be shown on a map.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      query: {
+        type: SchemaType.STRING,
+        description: 'The search query or description of what to show on the map',
+      } as const,
+    },
+    required: ['query'],
+  },
 }
 
 export const geminiProvider: LLMProvider = {
@@ -84,4 +100,69 @@ export const geminiProvider: LLMProvider = {
       throw new Error('Failed to parse map elements from AI response')
     }
   },
+}
+
+// New unified chat function with tool calling
+export async function chatWithTools(messages: LLMMessage[]): Promise<{
+  content: string
+  toolCalls?: { name: string; args: Record<string, unknown> }[]
+}> {
+  const genAI = getGeminiClient()
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    tools: [{ functionDeclarations: [generateMapElementsTool] }],
+  })
+
+  // Convert messages to Gemini format
+  const history = messages.slice(0, -1).map((msg) => ({
+    role: msg.role === 'assistant' ? 'model' as const : 'user' as const,
+    parts: [{ text: msg.content }],
+  }))
+
+  const chat = model.startChat({
+    history,
+    systemInstruction: {
+      role: 'user',
+      parts: [{ text: SYSTEM_PROMPT }],
+    },
+  })
+
+  const lastMessage = messages[messages.length - 1]
+
+  console.log('\n========== CHAT WITH TOOLS API CALL ==========')
+  console.log('Model: gemini-2.0-flash')
+  console.log('Tools: generate_map_elements')
+  console.log('Messages count:', messages.length)
+  console.log('Last message:', lastMessage.content)
+  console.log('--- History ---')
+  history.forEach((h, i) => console.log(`  ${i + 1}. [${h.role}]: ${h.parts[0].text.substring(0, 100)}...`))
+  console.log('--- End History ---\n')
+
+  const result = await chat.sendMessage(lastMessage.content)
+  const response = result.response
+
+  // Check for function calls
+  const functionCalls = response.functionCalls()
+
+  if (functionCalls && functionCalls.length > 0) {
+    console.log('--- Function Calls ---')
+    console.log(JSON.stringify(functionCalls, null, 2))
+    console.log('--- End Function Calls ---\n')
+
+    // Return the function calls for the API route to handle
+    return {
+      content: response.text() || '',
+      toolCalls: functionCalls.map((fc) => ({
+        name: fc.name,
+        args: fc.args as Record<string, unknown>,
+      })),
+    }
+  }
+
+  const responseText = response.text()
+  console.log('--- Response ---')
+  console.log(responseText)
+  console.log('=================================================\n')
+
+  return { content: responseText }
 }

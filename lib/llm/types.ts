@@ -28,7 +28,3 @@ export interface ChatResponse {
   content: string
 }
 
-export interface GenerateElementsRequest {
-  prompt: string
-  context?: string
-}
