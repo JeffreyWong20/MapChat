@@ -8,31 +8,28 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { X, ExternalLink } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
-import type { PinElement, ArcElement, AreaElement, RouteElement, LineElement } from '@/types'
+import type { MapElement } from '@/types'
 
-function getElementCoordinates(
-  element: PinElement | AreaElement | RouteElement | LineElement | ArcElement,
-): [number, number] {
+function getElementCoordinates(element: MapElement): [number, number] {
   switch (element.type) {
     case 'pin':
       return element.coordinates
     case 'arc':
-      // Return midpoint of arc
       return [
         (element.source[0] + element.target[0]) / 2,
         (element.source[1] + element.target[1]) / 2,
       ]
-    case 'area':
-      // Return centroid of first ring
+    case 'area': {
       const ring = element.coordinates[0]
       const sumLng = ring.reduce((acc, coord) => acc + coord[0], 0)
       const sumLat = ring.reduce((acc, coord) => acc + coord[1], 0)
       return [sumLng / ring.length, sumLat / ring.length]
+    }
     case 'route':
-    case 'line':
-      // Return midpoint of line
+    case 'line': {
       const midIndex = Math.floor(element.coordinates.length / 2)
       return element.coordinates[midIndex]
+    }
     default:
       return [0, 0]
   }
@@ -47,24 +44,15 @@ export function ElementPopup() {
     [elements, selectedElementId],
   )
 
+  const [editMode, setEditMode] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editIcon, setEditIcon] = useState('📍')
+  const [editColor, setEditColor] = useState('#FF6B6B')
+
   if (!selectedElement) return null
 
   const coordinates = getElementCoordinates(selectedElement)
-
-  // Editable state for pins
-  const [editMode, setEditMode] = useState(false)
-  const [editTitle, setEditTitle] = useState(
-    selectedElement.type === 'pin' ? selectedElement.title : '',
-  )
-  const [editDescription, setEditDescription] = useState(
-    selectedElement.type === 'pin' ? selectedElement.description : '',
-  )
-  const [editIcon, setEditIcon] = useState(
-    selectedElement.type === 'pin' ? selectedElement.icon || '📍' : '',
-  )
-  const [editColor, setEditColor] = useState(
-    selectedElement.type === 'pin' ? selectedElement.color || '#FF6B6B' : '',
-  )
 
   const handleSave = () => {
     updateElement(selectedElement.id, {
@@ -74,6 +62,15 @@ export function ElementPopup() {
       color: editColor,
     })
     setEditMode(false)
+  }
+
+  const handleStartEdit = () => {
+    if (selectedElement.type !== 'pin') return
+    setEditTitle(selectedElement.title)
+    setEditDescription(selectedElement.description)
+    setEditIcon(selectedElement.icon || '📍')
+    setEditColor(selectedElement.color || '#FF6B6B')
+    setEditMode(true)
   }
 
   return (
@@ -202,21 +199,10 @@ export function ElementPopup() {
               </div>
             )}
 
-            {/* Edit/Delete buttons for pins */}
             {selectedElement.type === 'pin' && !editMode && (
               <div className="pt-2 border-t flex justify-end gap-2">
                 {selectedElement.createdBy === 'user' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setEditTitle(selectedElement.title)
-                      setEditDescription(selectedElement.description)
-                      setEditIcon(selectedElement.icon || '📍')
-                      setEditColor(selectedElement.color || '#FF6B6B')
-                      setEditMode(true)
-                    }}
-                  >
+                  <Button variant="outline" size="sm" onClick={handleStartEdit}>
                     Edit
                   </Button>
                 )}

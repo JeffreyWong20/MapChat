@@ -9,20 +9,37 @@ import { isDateInRange } from '@/lib/utils/dates'
 import { MapLayers } from './MapLayers'
 import { ElementPopup } from './ElementPopup'
 import { AddPinDialog } from './AddPinDialog'
+import type { PinElement } from '@/types'
 
 const OPENFREEMAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty'
+
+interface PinData {
+  title: string
+  description: string
+  icon: string
+  color: string
+}
+
+function createPinElement(data: PinData, coordinates: [number, number]): PinElement {
+  return {
+    id: `pin_${Date.now()}`,
+    type: 'pin',
+    title: data.title,
+    description: data.description,
+    icon: data.icon,
+    color: data.color,
+    coordinates,
+    visible: true,
+    createdBy: 'user',
+  }
+}
 
 export function MapContainer() {
   const mapRef = useRef<MapRef>(null)
   const { viewState, setViewState, selectedElementId, setSelectedElement, elements, addElement } =
     useMapStore()
   const { startDate, endDate, isEnabled } = useTimelineStore()
-  const [pendingPin, setPendingPin] = useState<null | {
-    title: string
-    description: string
-    icon: string
-    color: string
-  }>(null)
+  const [pendingPin, setPendingPin] = useState<PinData | null>(null)
   const [showPinDialog, setShowPinDialog] = useState(false)
   const [rightClickLngLat, setRightClickLngLat] = useState<[number, number] | null>(null)
 
@@ -105,24 +122,12 @@ export function MapContainer() {
   const handleClick = useCallback(
     (evt: maplibregl.MapLayerMouseEvent) => {
       if (pendingPin) {
-        // Place pin at clicked location
-        const lngLat = evt.lngLat
-        addElement({
-          id: `pin_${Date.now()}`,
-          type: 'pin',
-          title: pendingPin.title,
-          description: pendingPin.description,
-          icon: pendingPin.icon,
-          color: pendingPin.color,
-          coordinates: [lngLat.lng, lngLat.lat],
-          visible: true,
-          createdBy: 'user',
-        })
+        addElement(createPinElement(pendingPin, [evt.lngLat.lng, evt.lngLat.lat]))
         setPendingPin(null)
         setRightClickLngLat(null)
         return
       }
-      // Check if clicked on a feature
+
       const features = evt.features
       if (features && features.length > 0) {
         const feature = features[0]
@@ -131,7 +136,7 @@ export function MapContainer() {
           return
         }
       }
-      // Clicked on empty space
+
       setSelectedElement(null)
     },
     [setSelectedElement, pendingPin, addElement],

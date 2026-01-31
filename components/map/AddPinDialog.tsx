@@ -1,3 +1,5 @@
+'use client'
+
 import { useState } from 'react'
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -70,24 +72,6 @@ export function AddPinDialog({
                 onChange={(e) => setIcon(e.target.value)}
                 maxLength={2}
                 style={{ width: 48 }}
-                onFocus={(e) => {
-                  // Try to open the emoji picker (native OS)
-                  if (navigator.userAgent.includes('Macintosh')) {
-                    // macOS shortcut: Cmd+Ctrl+Space
-                    window.dispatchEvent(
-                      new KeyboardEvent('keydown', {
-                        key: ' ',
-                        code: 'Space',
-                        metaKey: true,
-                        ctrlKey: true,
-                      }),
-                    )
-                  }
-                  // For Windows, user can use Win+.
-                  // Optionally, show a tooltip to guide the user
-                  e.target.title =
-                    'Tip: Press Cmd+Ctrl+Space (Mac) or Win+. (Windows) to open emoji picker.'
-                }}
               />
             </div>
             <div>
