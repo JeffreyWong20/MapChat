@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI, FunctionDeclaration, SchemaType } from '@google/generative-ai'
-import type { LLMProvider, LLMMessage, GenerateElementsResponse } from './types'
-import { SYSTEM_PROMPT, GENERATE_ELEMENTS_PROMPT } from './prompts'
+import type { LLMMessage } from './types'
+import { SYSTEM_PROMPT } from './prompts'
 
 const getGeminiClient = () => {
   const apiKey = process.env.GEMINI_API_KEY
@@ -10,108 +10,126 @@ const getGeminiClient = () => {
   return new GoogleGenerativeAI(apiKey)
 }
 
-// Define the tool for generating map elements
-const generateMapElementsTool: FunctionDeclaration = {
-  name: 'generate_map_elements',
-  description: 'Generate map elements (pins, areas, routes, arcs) to visualize locations, events, or geographic information on the map. Use this when the user asks about places, landmarks, historical events, routes, or anything that can be shown on a map.',
+// Tool 1: Add a new map element
+const addMapElementTool: FunctionDeclaration = {
+  name: 'addMapElement',
+  description: 'Add a new element to the map. Use this to create pins for locations, areas for regions, routes for paths, arcs for connections between places, or lines.',
   parameters: {
     type: SchemaType.OBJECT,
     properties: {
-      query: {
+      elementType: {
         type: SchemaType.STRING,
-        description: 'The search query or description of what to show on the map',
+        description: 'Type of element: "pin", "area", "route", "arc", or "line"',
+      } as const,
+      coordinates: {
+        type: SchemaType.STRING,
+        description: 'JSON string of coordinates. For pin: "[lng, lat]". For area: "[[[lng,lat], ...]]". For route/line: "[[lng,lat], ...]". For arc: "{ source: [lng,lat], target: [lng,lat] }"',
+      } as const,
+      properties: {
+        type: SchemaType.STRING,
+        description: 'JSON string with element properties: { title, description, color?, timeRange?: { start, end? }, article?: { title, content } }',
       } as const,
     },
-    required: ['query'],
+    required: ['elementType', 'coordinates', 'properties'],
   },
 }
 
-export const geminiProvider: LLMProvider = {
-  async chat(messages: LLMMessage[]): Promise<string> {
-    const genAI = getGeminiClient()
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
-
-    // Build conversation as a single prompt
-    const conversationParts = [
-      { text: `System: ${SYSTEM_PROMPT}\n\n` },
-      ...messages.map((msg) => ({
-        text: `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`,
-      })),
-      { text: 'Assistant: ' },
-    ]
-
-    const fullPromptText = conversationParts.map(p => p.text).join('')
-
-    // Log the API call context
-    console.log('\n========== CHAT API CALL ==========')
-    console.log('Model: gemini-2.0-flash')
-    console.log('Messages count:', messages.length)
-    console.log('--- Full Prompt ---')
-    console.log(fullPromptText)
-    console.log('--- End Prompt ---\n')
-
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: conversationParts }],
-    })
-    const responseText = result.response.text()
-
-    console.log('--- Response ---')
-    console.log(responseText)
-    console.log('=====================================\n')
-
-    return responseText
-  },
-
-  async generateElements(prompt: string, context?: string): Promise<GenerateElementsResponse> {
-    const genAI = getGeminiClient()
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
-
-    const fullPrompt = context
-      ? `${GENERATE_ELEMENTS_PROMPT}\n\nContext: ${context}\n\nUser request: ${prompt}\n\nRespond with valid JSON only, no markdown code blocks.`
-      : `${GENERATE_ELEMENTS_PROMPT}\n\nUser request: ${prompt}\n\nRespond with valid JSON only, no markdown code blocks.`
-
-    // Log the API call context
-    console.log('\n========== GENERATE ELEMENTS API CALL ==========')
-    console.log('Model: gemini-2.0-flash')
-    console.log('User prompt:', prompt)
-    console.log('Context:', context || '(none)')
-    console.log('--- Full Prompt ---')
-    console.log(fullPrompt)
-    console.log('--- End Prompt ---\n')
-
-    const result = await model.generateContent(fullPrompt)
-    let text = result.response.text()
-
-    console.log('--- Raw Response ---')
-    console.log(text)
-    console.log('--- End Raw Response ---\n')
-
-    // Clean up potential markdown code blocks
-    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-
-    try {
-      const parsed = JSON.parse(text) as GenerateElementsResponse
-      console.log('--- Parsed Response ---')
-      console.log(JSON.stringify(parsed, null, 2))
-      console.log('=================================================\n')
-      return parsed
-    } catch (error) {
-      console.error('Failed to parse Gemini response:', text)
-      throw new Error('Failed to parse map elements from AI response')
-    }
+// Tool 2: Update an existing map element
+const updateMapElementTool: FunctionDeclaration = {
+  name: 'updateMapElement',
+  description: 'Update properties of an existing map element by its ID. Use this to modify title, description, color, visibility, or other properties.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      elementId: {
+        type: SchemaType.STRING,
+        description: 'The ID of the element to update',
+      } as const,
+      newProperties: {
+        type: SchemaType.STRING,
+        description: 'JSON string with properties to update: { title?, description?, color?, visible?, timeRange?, article? }',
+      } as const,
+    },
+    required: ['elementId', 'newProperties'],
   },
 }
 
-// New unified chat function with tool calling
-export async function chatWithTools(messages: LLMMessage[]): Promise<{
+// Tool 3: Remove a map element
+const removeMapElementTool: FunctionDeclaration = {
+  name: 'removeMapElement',
+  description: 'Remove an element from the map by its ID.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      elementId: {
+        type: SchemaType.STRING,
+        description: 'The ID of the element to remove',
+      } as const,
+    },
+    required: ['elementId'],
+  },
+}
+
+// Tool 4: Set map view
+const setMapViewTool: FunctionDeclaration = {
+  name: 'setMapView',
+  description: 'Set the map view to focus on a specific location and zoom level.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      longitude: {
+        type: SchemaType.NUMBER,
+        description: 'Longitude of the center point',
+      } as const,
+      latitude: {
+        type: SchemaType.NUMBER,
+        description: 'Latitude of the center point',
+      } as const,
+      zoom: {
+        type: SchemaType.NUMBER,
+        description: 'Zoom level (1-20, where 1 is world view and 20 is street level)',
+      } as const,
+    },
+    required: ['longitude', 'latitude', 'zoom'],
+  },
+}
+
+export interface ToolCall {
+  name: string
+  args: Record<string, unknown>
+}
+
+export interface ChatWithToolsResult {
   content: string
-  toolCalls?: { name: string; args: Record<string, unknown> }[]
-}> {
+  toolCalls?: ToolCall[]
+}
+
+// Chat function with map control tools
+export async function chatWithMapTools(
+  messages: LLMMessage[],
+  mapState: string // JSON string of current map elements
+): Promise<ChatWithToolsResult> {
   const genAI = getGeminiClient()
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.0-flash',
-    tools: [{ functionDeclarations: [generateMapElementsTool] }],
+    tools: [{
+      functionDeclarations: [
+        addMapElementTool,
+        updateMapElementTool,
+        removeMapElementTool,
+        setMapViewTool,
+      ]
+    }],
   })
+
+  // Build system prompt with map state context
+  const systemWithMapState = `${SYSTEM_PROMPT}
+
+CURRENT MAP STATE:
+${mapState}
+
+When adding elements, generate unique IDs like "pin_1", "area_1", etc. Check the current map state to avoid duplicate IDs.
+Use accurate real-world coordinates (longitude, latitude) for locations.`
 
   // Convert messages to Gemini format
   const history = messages.slice(0, -1).map((msg) => ({
@@ -123,17 +141,18 @@ export async function chatWithTools(messages: LLMMessage[]): Promise<{
     history,
     systemInstruction: {
       role: 'user',
-      parts: [{ text: SYSTEM_PROMPT }],
+      parts: [{ text: systemWithMapState }],
     },
   })
 
   const lastMessage = messages[messages.length - 1]
 
-  console.log('\n========== CHAT WITH TOOLS API CALL ==========')
+  console.log('\n========== CHAT WITH MAP TOOLS ==========')
   console.log('Model: gemini-2.0-flash')
-  console.log('Tools: generate_map_elements')
+  console.log('Tools: addMapElement, updateMapElement, removeMapElement, setMapView')
   console.log('Messages count:', messages.length)
   console.log('Last message:', lastMessage.content)
+  console.log('Map state elements count:', JSON.parse(mapState).length)
   console.log('--- History ---')
   history.forEach((h, i) => console.log(`  ${i + 1}. [${h.role}]: ${h.parts[0].text.substring(0, 100)}...`))
   console.log('--- End History ---\n')
@@ -145,11 +164,10 @@ export async function chatWithTools(messages: LLMMessage[]): Promise<{
   const functionCalls = response.functionCalls()
 
   if (functionCalls && functionCalls.length > 0) {
-    console.log('--- Function Calls ---')
+    console.log('--- Tool Calls ---')
     console.log(JSON.stringify(functionCalls, null, 2))
-    console.log('--- End Function Calls ---\n')
+    console.log('--- End Tool Calls ---\n')
 
-    // Return the function calls for the API route to handle
     return {
       content: response.text() || '',
       toolCalls: functionCalls.map((fc) => ({
@@ -162,7 +180,7 @@ export async function chatWithTools(messages: LLMMessage[]): Promise<{
   const responseText = response.text()
   console.log('--- Response ---')
   console.log(responseText)
-  console.log('=================================================\n')
+  console.log('==========================================\n')
 
   return { content: responseText }
 }

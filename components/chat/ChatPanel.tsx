@@ -5,38 +5,152 @@ import { useMapStore } from '@/stores/mapStore'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { toast } from 'sonner'
+import { generateId } from '@/lib/utils/id'
+import type { MapElement, PinElement, AreaElement, RouteElement, LineElement, ArcElement } from '@/types'
 
-interface ToolResult {
-  tool: string
-  result?: {
-    elements: Array<unknown>
-    summary: string
-    suggestedViewState?: {
-      longitude: number
-      latitude: number
-      zoom: number
-    }
-  }
-  error?: string
+interface ToolCall {
+  name: string
+  args: Record<string, unknown>
 }
 
 interface ChatResponse {
   content: string
-  toolResults?: ToolResult[]
+  toolCalls: ToolCall[]
 }
 
 export function ChatPanel() {
   const { addMessage, setLoading, messages } = useChatStore()
-  const { addElements, setViewState } = useMapStore()
+  const { elements, addElement, updateElement, removeElement, setViewState } = useMapStore()
+
+  const handleToolCall = (toolCall: ToolCall) => {
+    console.log('Executing tool:', toolCall.name, toolCall.args)
+
+    switch (toolCall.name) {
+      case 'addMapElement': {
+        const { elementType, coordinates, properties } = toolCall.args
+        try {
+          const coords = JSON.parse(coordinates as string)
+          const props = JSON.parse(properties as string)
+          const id = `${elementType}_${generateId(6)}`
+
+          let element: MapElement
+
+          if (elementType === 'pin') {
+            element = {
+              id,
+              type: 'pin',
+              coordinates: coords as [number, number],
+              title: props.title || 'Untitled',
+              description: props.description || '',
+              color: props.color,
+              visible: true,
+              timeRange: props.timeRange,
+              article: props.article,
+            } as PinElement
+          } else if (elementType === 'area') {
+            element = {
+              id,
+              type: 'area',
+              coordinates: coords as [number, number][][],
+              title: props.title || 'Untitled',
+              description: props.description || '',
+              color: props.color,
+              visible: true,
+              timeRange: props.timeRange,
+              article: props.article,
+            } as AreaElement
+          } else if (elementType === 'route') {
+            element = {
+              id,
+              type: 'route',
+              coordinates: coords as [number, number][],
+              title: props.title || 'Untitled',
+              description: props.description || '',
+              color: props.color,
+              visible: true,
+              timeRange: props.timeRange,
+              article: props.article,
+            } as RouteElement
+          } else if (elementType === 'line') {
+            element = {
+              id,
+              type: 'line',
+              coordinates: coords as [number, number][],
+              title: props.title || 'Untitled',
+              description: props.description || '',
+              color: props.color,
+              visible: true,
+              timeRange: props.timeRange,
+              article: props.article,
+            } as LineElement
+          } else if (elementType === 'arc') {
+            element = {
+              id,
+              type: 'arc',
+              source: coords.source as [number, number],
+              target: coords.target as [number, number],
+              title: props.title || 'Untitled',
+              description: props.description || '',
+              color: props.color,
+              visible: true,
+              timeRange: props.timeRange,
+              article: props.article,
+            } as ArcElement
+          } else {
+            console.error('Unknown element type:', elementType)
+            return
+          }
+
+          addElement(element)
+          console.log('Added element:', element)
+        } catch (error) {
+          console.error('Failed to add element:', error)
+        }
+        break
+      }
+
+      case 'updateMapElement': {
+        const { elementId, newProperties } = toolCall.args
+        try {
+          const props = JSON.parse(newProperties as string)
+          updateElement(elementId as string, props)
+          console.log('Updated element:', elementId, props)
+        } catch (error) {
+          console.error('Failed to update element:', error)
+        }
+        break
+      }
+
+      case 'removeMapElement': {
+        const { elementId } = toolCall.args
+        removeElement(elementId as string)
+        console.log('Removed element:', elementId)
+        break
+      }
+
+      case 'setMapView': {
+        const { longitude, latitude, zoom } = toolCall.args
+        setViewState({
+          longitude: longitude as number,
+          latitude: latitude as number,
+          zoom: zoom as number,
+        })
+        console.log('Set map view:', { longitude, latitude, zoom })
+        break
+      }
+
+      default:
+        console.warn('Unknown tool call:', toolCall.name)
+    }
+  }
 
   const handleSend = async (content: string) => {
-    // Add user message
     addMessage('user', content)
     setLoading(true)
 
     try {
-      // Send message to chat API (which now handles tool calling)
-      const chatResponse = await fetch('/api/chat', {
+      // Send message with current map state
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -44,36 +158,43 @@ export function ChatPanel() {
             ...messages.map((m) => ({ role: m.role, content: m.content })),
             { role: 'user', content },
           ],
+          mapState: JSON.stringify(elements),
         }),
       })
 
-      if (!chatResponse.ok) {
+      if (!response.ok) {
         throw new Error('Failed to get chat response')
       }
 
-      const data: ChatResponse = await chatResponse.json()
+      const data: ChatResponse = await response.json()
+
+      // Execute any tool calls
+      if (data.toolCalls && data.toolCalls.length > 0) {
+        let addedCount = 0
+        let updatedCount = 0
+        let removedCount = 0
+
+        for (const toolCall of data.toolCalls) {
+          handleToolCall(toolCall)
+          if (toolCall.name === 'addMapElement') addedCount++
+          if (toolCall.name === 'updateMapElement') updatedCount++
+          if (toolCall.name === 'removeMapElement') removedCount++
+        }
+
+        // Show toast summary
+        const actions = []
+        if (addedCount > 0) actions.push(`Added ${addedCount} element${addedCount > 1 ? 's' : ''}`)
+        if (updatedCount > 0) actions.push(`Updated ${updatedCount} element${updatedCount > 1 ? 's' : ''}`)
+        if (removedCount > 0) actions.push(`Removed ${removedCount} element${removedCount > 1 ? 's' : ''}`)
+        if (actions.length > 0) {
+          toast.success(actions.join(', '))
+        }
+      }
 
       // Add assistant message
-      addMessage('assistant', data.content)
-
-      // Handle tool results (map elements generated by the model's decision)
-      if (data.toolResults && data.toolResults.length > 0) {
-        for (const toolResult of data.toolResults) {
-          if (toolResult.tool === 'generate_map_elements' && toolResult.result) {
-            const { elements, suggestedViewState } = toolResult.result
-
-            if (elements && elements.length > 0) {
-              addElements(elements as Parameters<typeof addElements>[0])
-              toast.success(`Added ${elements.length} elements to map`)
-            }
-
-            if (suggestedViewState) {
-              setViewState(suggestedViewState)
-            }
-          } else if (toolResult.error) {
-            toast.error(toolResult.error)
-          }
-        }
+      const responseContent = data.content || (data.toolCalls?.length > 0 ? 'Done! I\'ve updated the map for you.' : '')
+      if (responseContent) {
+        addMessage('assistant', responseContent)
       }
     } catch (error) {
       console.error('Chat error:', error)
@@ -88,6 +209,7 @@ export function ChatPanel() {
     <div className="flex flex-col h-full bg-background">
       <div className="px-4 py-3 border-b">
         <h2 className="font-semibold">Chat</h2>
+        <p className="text-xs text-muted-foreground">{elements.length} elements on map</p>
       </div>
       <MessageList />
       <ChatInput onSend={handleSend} />
