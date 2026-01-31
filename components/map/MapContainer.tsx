@@ -93,12 +93,50 @@ export function MapContainer() {
 
       if (minLng === Infinity) return
 
+      // Compute bounding box of ALL visible elements to derive a sensible maxZoom.
+      // This prevents jarring zoom-ins when only a few nearby elements are in range.
+      let allMinLng = Infinity, allMaxLng = -Infinity
+      let allMinLat = Infinity, allMaxLat = -Infinity
+
+      const extendAll = (lng: number, lat: number) => {
+        allMinLng = Math.min(allMinLng, lng)
+        allMaxLng = Math.max(allMaxLng, lng)
+        allMinLat = Math.min(allMinLat, lat)
+        allMaxLat = Math.max(allMaxLat, lat)
+      }
+
+      for (const el of elements.filter((e) => e.visible)) {
+        switch (el.type) {
+          case 'pin':
+            extendAll(el.coordinates[0], el.coordinates[1])
+            break
+          case 'area':
+            el.coordinates[0]?.forEach((c) => extendAll(c[0], c[1]))
+            break
+          case 'route':
+          case 'line':
+            el.coordinates.forEach((c) => extendAll(c[0], c[1]))
+            break
+          case 'arc':
+            extendAll(el.source[0], el.source[1])
+            extendAll(el.target[0], el.target[1])
+            break
+        }
+      }
+
+      // Derive maxZoom: allow zooming ~2 levels beyond what fits the full scene
+      const allLngSpan = allMaxLng - allMinLng
+      const allLatSpan = allMaxLat - allMinLat
+      const maxSpan = Math.max(allLngSpan, allLatSpan, 0.001)
+      const sceneZoom = Math.log2(360 / maxSpan)
+      const maxZoom = Math.min(sceneZoom + 2, 18)
+
       mapRef.current.fitBounds(
         [
           [minLng, minLat],
           [maxLng, maxLat],
         ],
-        { padding: 80, duration: 300 },
+        { padding: 80, duration: 300, maxZoom },
       )
     }
 
