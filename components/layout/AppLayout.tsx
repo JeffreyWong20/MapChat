@@ -3,14 +3,14 @@
 import { ReactNode, useState } from 'react'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { Header, type ViewMode } from './Header'
+import { TimelineSlider } from '@/components/timeline'
 
 interface AppLayoutProps {
   mapPanel: ReactNode
   chatPanel: ReactNode
-  timelinePanel: ReactNode
 }
 
-export function AppLayout({ mapPanel, chatPanel, timelinePanel }: AppLayoutProps) {
+export function AppLayout({ mapPanel, chatPanel }: AppLayoutProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('split')
 
   return (
@@ -20,9 +20,9 @@ export function AppLayout({ mapPanel, chatPanel, timelinePanel }: AppLayoutProps
         {viewMode === 'split' && (
           <ResizablePanelGroup orientation="horizontal" className="flex-1">
             <ResizablePanel defaultSize={60} minSize={30}>
-              <div className="h-full flex flex-col">
-                <div className="flex-1 relative">{mapPanel}</div>
-                <div className="border-t">{timelinePanel}</div>
+              <div className="h-full relative">
+                {mapPanel}
+                <TimelineSlider />
               </div>
             </ResizablePanel>
             <ResizableHandle withHandle />
@@ -32,9 +32,9 @@ export function AppLayout({ mapPanel, chatPanel, timelinePanel }: AppLayoutProps
           </ResizablePanelGroup>
         )}
         {viewMode === 'map' && (
-          <div className="flex-1 flex flex-col">
-            <div className="flex-1 relative">{mapPanel}</div>
-            <div className="border-t">{timelinePanel}</div>
+          <div className="flex-1 relative">
+            {mapPanel}
+            <TimelineSlider />
           </div>
         )}
         {viewMode === 'chat' && <div className="flex-1">{chatPanel}</div>}

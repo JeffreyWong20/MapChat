@@ -6,15 +6,26 @@ import { useTimelineStore } from '@/stores/timelineStore'
 import { useMapStore } from '@/stores/mapStore'
 import { getDateRange, formatDate } from '@/lib/utils/dates'
 import { cn } from '@/lib/utils'
-import { Clock, X } from 'lucide-react'
+import { Clock, Play, Pause, X } from 'lucide-react'
 
 const DAY_MS = 86400000
+const HOUR_MS = 3600000
+const MIN15_MS = 900000
+
+function getGranularity(totalRange: number): { stepMs: number; dateFormat: string } {
+  if (totalRange < 3 * DAY_MS) return { stepMs: MIN15_MS, dateFormat: 'MMM d, h:mm a' }
+  if (totalRange < 7 * DAY_MS) return { stepMs: HOUR_MS, dateFormat: 'MMM d, h:mm a' }
+  if (totalRange < 90 * DAY_MS) return { stepMs: 6 * HOUR_MS, dateFormat: 'MMM d, h:mm a' }
+  return { stepMs: DAY_MS, dateFormat: 'MMM d, yyyy' }
+}
 
 export function TimelineSlider() {
   const { startDate, endDate, isEnabled, setRange, setEnabled, reset } = useTimelineStore()
   const { elements } = useMapStore()
   const trackRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState<'start' | 'end' | 'range' | null>(null)
+  const [playing, setPlaying] = useState(false)
+  const playRef = useRef({ start: 0, end: 0 })
   const dragStateRef = useRef<{
     type: 'start' | 'end' | 'range'
     startX: number
@@ -32,6 +43,8 @@ export function TimelineSlider() {
   const maxTime = dateRange ? new Date(dateRange.max).getTime() : 0
   const totalRange = maxTime - minTime || DAY_MS
 
+  const { stepMs, dateFormat } = useMemo(() => getGranularity(totalRange), [totalRange])
+
   // Initialize timeline when elements with dates are added
   useEffect(() => {
     if (dateRange && !startDate && !endDate) {
@@ -48,19 +61,19 @@ export function TimelineSlider() {
       if (!ds || !trackRef.current) return
       const trackWidth = trackRef.current.getBoundingClientRect().width
       const timeDelta = ((e.clientX - ds.startX) / trackWidth) * totalRange
-      const snapToDay = (t: number) => Math.round(t / DAY_MS) * DAY_MS
+      const snap = (t: number) => Math.round(t / stepMs) * stepMs
 
       if (ds.type === 'start') {
-        const raw = snapToDay(ds.origStart + timeDelta)
-        const clamped = Math.max(minTime, Math.min(raw, ds.origEnd - DAY_MS))
+        const raw = snap(ds.origStart + timeDelta)
+        const clamped = Math.max(minTime, Math.min(raw, ds.origEnd - stepMs))
         setRange(new Date(clamped).toISOString(), new Date(ds.origEnd).toISOString())
       } else if (ds.type === 'end') {
-        const raw = snapToDay(ds.origEnd + timeDelta)
-        const clamped = Math.max(ds.origStart + DAY_MS, Math.min(raw, maxTime))
+        const raw = snap(ds.origEnd + timeDelta)
+        const clamped = Math.max(ds.origStart + stepMs, Math.min(raw, maxTime))
         setRange(new Date(ds.origStart).toISOString(), new Date(clamped).toISOString())
       } else {
         const windowSize = ds.origEnd - ds.origStart
-        let newStart = snapToDay(ds.origStart + timeDelta)
+        let newStart = snap(ds.origStart + timeDelta)
         let newEnd = newStart + windowSize
         if (newStart < minTime) {
           newStart = minTime
@@ -85,24 +98,47 @@ export function TimelineSlider() {
       document.removeEventListener('pointermove', onMove)
       document.removeEventListener('pointerup', onUp)
     }
-  }, [dragging, minTime, maxTime, totalRange, setRange])
+  }, [dragging, minTime, maxTime, totalRange, stepMs, setRange])
 
-  if (!dateRange) {
-    return (
-      <div className="flex items-center justify-center h-16 px-4 text-sm text-muted-foreground">
-        <Clock className="h-4 w-4 mr-2" />
-        Add elements with dates to enable timeline filtering
-      </div>
-    )
-  }
-
-  // Clamp persisted values to current element range
-  const currentStart = startDate
+  // Clamp persisted values to current element range (needed by play effect, so before early return)
+  const currentStart = dateRange && startDate
     ? Math.max(minTime, Math.min(new Date(startDate).getTime(), maxTime))
     : minTime
-  const currentEnd = endDate
+  const currentEnd = dateRange && endDate
     ? Math.max(minTime, Math.min(new Date(endDate).getTime(), maxTime))
     : maxTime
+
+  // Keep play ref in sync for interval reads
+  playRef.current = { start: currentStart, end: currentEnd }
+
+  // Stop playing when user drags
+  useEffect(() => {
+    if (dragging) setPlaying(false)
+  }, [dragging])
+
+  // Play animation: advance the window by stepMs each tick
+  useEffect(() => {
+    if (!playing) return
+
+    const id = setInterval(() => {
+      const { start, end } = playRef.current
+      const windowSize = end - start
+      const newStart = start + stepMs
+      const newEnd = newStart + windowSize
+
+      if (newEnd >= maxTime) {
+        setRange(new Date(maxTime - windowSize).toISOString(), new Date(maxTime).toISOString())
+        setPlaying(false)
+        return
+      }
+
+      setRange(new Date(newStart).toISOString(), new Date(newEnd).toISOString())
+    }, 150)
+
+    return () => clearInterval(id)
+  }, [playing, stepMs, maxTime, setRange])
+
+  if (!dateRange) return null
 
   const startPercent = totalRange > 0 ? ((currentStart - minTime) / totalRange) * 100 : 0
   const endPercent = totalRange > 0 ? ((currentEnd - minTime) / totalRange) * 100 : 100
@@ -121,7 +157,7 @@ export function TimelineSlider() {
     }
 
   return (
-    <div className="px-4 py-3 space-y-2">
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 w-[min(44rem,calc(100%-2rem))] rounded-xl bg-background/80 backdrop-blur-md shadow-lg border px-4 py-3 space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" />
@@ -129,14 +165,37 @@ export function TimelineSlider() {
         </div>
         <div className="flex items-center gap-2">
           <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => {
+              if (playing) {
+                setPlaying(false)
+                return
+              }
+              if (!isEnabled) setEnabled(true)
+              // If window covers the full range, shrink to ~10% starting from the left
+              if (currentStart <= minTime && currentEnd >= maxTime) {
+                const windowSize = Math.max(stepMs, totalRange * 0.1)
+                setRange(
+                  new Date(minTime).toISOString(),
+                  new Date(minTime + windowSize).toISOString(),
+                )
+              }
+              setPlaying(true)
+            }}
+          >
+            {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </Button>
+          <Button
             variant={isEnabled ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setEnabled(!isEnabled)}
+            onClick={() => { setPlaying(false); setEnabled(!isEnabled) }}
           >
             {isEnabled ? 'Filtering Active' : 'Enable Filter'}
           </Button>
           {isEnabled && (
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={reset}>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setPlaying(false); reset() }}>
               <X className="h-4 w-4" />
             </Button>
           )}
@@ -197,8 +256,8 @@ export function TimelineSlider() {
 
         {/* Date labels */}
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span>{formatDate(startDate || dateRange.min)}</span>
-          <span>{formatDate(endDate || dateRange.max)}</span>
+          <span>{formatDate(startDate || dateRange.min, dateFormat)}</span>
+          <span>{formatDate(endDate || dateRange.max, dateFormat)}</span>
         </div>
       </div>
     </div>

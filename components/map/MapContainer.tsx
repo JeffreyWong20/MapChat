@@ -16,11 +16,14 @@ export function MapContainer() {
   const { viewState, setViewState, selectedElementId, setSelectedElement, elements } = useMapStore()
   const { startDate, endDate, isEnabled } = useTimelineStore()
 
-  // Auto-focus map on in-range elements when timeline changes (debounced)
+  // Auto-focus map on in-range elements when timeline changes (throttled)
+  const lastFitRef = useRef(0)
+
   useEffect(() => {
     if (!isEnabled || !startDate || !endDate) return
 
-    const timer = setTimeout(() => {
+    const doFit = () => {
+      lastFitRef.current = Date.now()
       if (!mapRef.current) return
 
       const inRange = elements.filter((el) => {
@@ -68,10 +71,17 @@ export function MapContainer() {
           [minLng, minLat],
           [maxLng, maxLat],
         ],
-        { padding: 80, duration: 500 },
+        { padding: 80, duration: 300 },
       )
-    }, 300)
+    }
 
+    const elapsed = Date.now() - lastFitRef.current
+    if (elapsed >= 300) {
+      doFit()
+      return
+    }
+
+    const timer = setTimeout(doFit, 300 - elapsed)
     return () => clearTimeout(timer)
   }, [startDate, endDate, isEnabled, elements])
 
