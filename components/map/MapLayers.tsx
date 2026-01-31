@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { Source, Layer } from 'react-map-gl/maplibre'
+import { Source, Layer, Marker } from 'react-map-gl/maplibre'
 import { useMapStore } from '@/stores/mapStore'
 import { useTimelineStore } from '@/stores/timelineStore'
 import { isDateInRange } from '@/lib/utils/dates'
@@ -36,7 +36,7 @@ function generateArcCoordinates(
 }
 
 export function MapLayers() {
-  const { elements, selectedElementId } = useMapStore()
+  const { elements, selectedElementId, setSelectedElement } = useMapStore()
   const { startDate, endDate, isEnabled } = useTimelineStore()
 
   const filteredElements = useMemo(() => {
@@ -51,26 +51,6 @@ export function MapLayers() {
   const routes = filteredElements.filter((el): el is RouteElement => el.type === 'route')
   const lines = filteredElements.filter((el): el is LineElement => el.type === 'line')
   const arcs = filteredElements.filter((el): el is ArcElement => el.type === 'arc')
-
-  const pinsGeoJSON = useMemo(
-    () => ({
-      type: 'FeatureCollection' as const,
-      features: pins.map((pin) => ({
-        type: 'Feature' as const,
-        properties: {
-          id: pin.id,
-          title: pin.title,
-          color: pin.color || '#FF6B6B',
-          selected: pin.id === selectedElementId,
-        },
-        geometry: {
-          type: 'Point' as const,
-          coordinates: pin.coordinates,
-        },
-      })),
-    }),
-    [pins, selectedElementId],
-  )
 
   const areasGeoJSON = useMemo(
     () => ({
@@ -211,19 +191,45 @@ export function MapLayers() {
         />
       </Source>
 
-      {/* Pins Layer */}
-      <Source id="pins-source" type="geojson" data={pinsGeoJSON}>
-        <Layer
-          id="pins-layer"
-          type="circle"
-          paint={{
-            'circle-radius': ['case', ['get', 'selected'], 12, 8],
-            'circle-color': ['get', 'color'],
-            'circle-stroke-width': ['case', ['get', 'selected'], 3, 2],
-            'circle-stroke-color': '#ffffff',
-          }}
-        />
-      </Source>
+      {/* Pins - HTML Markers for color emoji support */}
+      {pins.map((pin) => (
+        <Marker
+          key={pin.id}
+          longitude={pin.coordinates[0]}
+          latitude={pin.coordinates[1]}
+          anchor="center"
+        >
+          <div
+            className="flex flex-col items-center cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation()
+              setSelectedElement(pin.id)
+            }}
+            style={{
+              transform: pin.id === selectedElementId ? 'scale(1.2)' : 'scale(1)',
+              transition: 'transform 0.2s',
+            }}
+          >
+            <div
+              className="flex items-center justify-center rounded-full bg-white shadow-lg"
+              style={{
+                width: 36,
+                height: 36,
+                border: `3px solid ${pin.color || '#FF6B6B'}`,
+                fontSize: 20,
+              }}
+            >
+              {pin.icon || '📍'}
+            </div>
+            <div
+              className="mt-1 px-1 text-xs font-medium text-center bg-white/90 rounded shadow-sm max-w-[100px] truncate"
+              style={{ color: '#333' }}
+            >
+              {pin.title}
+            </div>
+          </div>
+        </Marker>
+      ))}
     </>
   )
 }

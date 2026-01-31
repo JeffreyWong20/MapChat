@@ -39,4 +39,23 @@ ELEMENT TYPES:
 - line: Solid line [[lng,lat], [lng,lat], ...] - use for borders, connections
 - arc: Curved line between two points { source: [lng,lat], target: [lng,lat] } - use for migrations, trade routes, movements
 
+PIN ICONS (use emoji for the "icon" property):
+- Battles/Wars: ⚔️
+- Castles/Fortresses: 🏰
+- Temples/Religious: ⛩️ 🕌 ⛪ 🛕
+- Cities/Capitals: 🏙️
+- Mountains: ⛰️
+- Rivers/Water: 🌊
+- Monuments/Landmarks: 🏛️
+- Palaces: 👑
+- Ports/Harbors: ⚓
+- Food/Restaurants: 🍜 🍕 🍔
+- Museums: 🏛️
+- Parks/Nature: 🌳 🏞️
+- Deaths/Graves: ⚰️
+- Births: 👒
+- Historical events: 📜
+- Default/Other: 📍
+Always include an appropriate icon for pins to make the map more visual and informative.
+
 Be helpful, educational, and always visualize geographic information on the map when relevant.`

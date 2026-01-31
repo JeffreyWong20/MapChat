@@ -46,7 +46,6 @@ export function MapContainer() {
       style={{ width: '100%', height: '100%' }}
       mapStyle={OPENFREEMAP_STYLE}
       interactiveLayerIds={[
-        'pins-layer',
         'areas-layer',
         'routes-layer',
         'lines-layer',

@@ -30,7 +30,7 @@ const addMapElementTool: FunctionDeclaration = {
       properties: {
         type: SchemaType.STRING,
         description:
-          'JSON string with element properties: { title, description, color?, timeRange?: { start, end? }, article?: { title, content } }',
+          'JSON string with element properties: { title, description, color?, icon? (emoji for pins, e.g. "⚔️" for battles, "🏰" for castles, "🏛️" for monuments), timeRange?: { start, end? }, article?: { title, content } }',
       } as const,
     },
     required: ['elementType', 'coordinates', 'properties'],
@@ -154,7 +154,7 @@ export async function chatWithMapTools(
 ): Promise<ChatWithToolsResult> {
   const genAI = getGeminiClient()
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-pro',
     tools: [
       {
         functionDeclarations: [
@@ -194,7 +194,7 @@ Use accurate real-world coordinates (longitude, latitude) for locations.`
   const lastMessage = messages[messages.length - 1]
 
   console.log('\n========== CHAT WITH MAP TOOLS ==========')
-  console.log('Model: gemini-2.0-flash')
+  console.log('Model: gemini-2.5-pro')
   console.log('Tools: addMapElement, updateMapElement, removeMapElement, setMapView, getRoute')
   console.log('Messages count:', messages.length)
   console.log('Last message:', lastMessage.content)

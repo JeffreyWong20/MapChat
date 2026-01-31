@@ -187,6 +187,7 @@ export function ChatPanel() {
               title: props.title || 'Untitled',
               description: props.description || '',
               color: props.color,
+              icon: props.icon || '📍',
               visible: true,
               timeRange: props.timeRange,
               article: props.article,

@@ -26,6 +26,7 @@ interface BaseMapElement {
 export interface PinElement extends BaseMapElement {
   type: 'pin'
   coordinates: [number, number] // [lng, lat]
+  icon?: string // Emoji icon for the pin
 }
 
 export interface AreaElement extends BaseMapElement {
