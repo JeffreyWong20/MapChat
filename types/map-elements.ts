@@ -21,12 +21,14 @@ interface BaseMapElement {
   timeRange?: TimeRange
   visible: boolean
   color?: string
+  createdBy?: 'user' | 'llm'
 }
 
 export interface PinElement extends BaseMapElement {
   type: 'pin'
   coordinates: [number, number] // [lng, lat]
   icon?: string // Emoji icon for the pin
+  createdBy?: 'user' | 'llm'
 }
 
 export interface AreaElement extends BaseMapElement {

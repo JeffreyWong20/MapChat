@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Map, { NavigationControl, MapRef } from 'react-map-gl/maplibre'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMapStore } from '@/stores/mapStore'
@@ -8,13 +8,23 @@ import { useTimelineStore } from '@/stores/timelineStore'
 import { isDateInRange } from '@/lib/utils/dates'
 import { MapLayers } from './MapLayers'
 import { ElementPopup } from './ElementPopup'
+import { AddPinDialog } from './AddPinDialog'
 
 const OPENFREEMAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty'
 
 export function MapContainer() {
   const mapRef = useRef<MapRef>(null)
-  const { viewState, setViewState, selectedElementId, setSelectedElement, elements } = useMapStore()
+  const { viewState, setViewState, selectedElementId, setSelectedElement, elements, addElement } =
+    useMapStore()
   const { startDate, endDate, isEnabled } = useTimelineStore()
+  const [pendingPin, setPendingPin] = useState<null | {
+    title: string
+    description: string
+    icon: string
+    color: string
+  }>(null)
+  const [showPinDialog, setShowPinDialog] = useState(false)
+  const [rightClickLngLat, setRightClickLngLat] = useState<[number, number] | null>(null)
 
   // Auto-focus map on in-range elements when timeline changes (throttled)
   const lastFitRef = useRef(0)
@@ -94,6 +104,24 @@ export function MapContainer() {
 
   const handleClick = useCallback(
     (evt: maplibregl.MapLayerMouseEvent) => {
+      if (pendingPin) {
+        // Place pin at clicked location
+        const lngLat = evt.lngLat
+        addElement({
+          id: `pin_${Date.now()}`,
+          type: 'pin',
+          title: pendingPin.title,
+          description: pendingPin.description,
+          icon: pendingPin.icon,
+          color: pendingPin.color,
+          coordinates: [lngLat.lng, lngLat.lat],
+          visible: true,
+          createdBy: 'user',
+        })
+        setPendingPin(null)
+        setRightClickLngLat(null)
+        return
+      }
       // Check if clicked on a feature
       const features = evt.features
       if (features && features.length > 0) {
@@ -106,27 +134,63 @@ export function MapContainer() {
       // Clicked on empty space
       setSelectedElement(null)
     },
-    [setSelectedElement],
+    [setSelectedElement, pendingPin, addElement],
   )
 
+  // Right-click handler
+  const handleContextMenu = useCallback((evt: maplibregl.MapLayerMouseEvent) => {
+    evt.originalEvent.preventDefault()
+    setShowPinDialog(true)
+    setRightClickLngLat([evt.lngLat.lng, evt.lngLat.lat])
+  }, [])
+
   return (
-    <Map
-      ref={mapRef}
-      {...viewState}
-      onMove={handleMove}
-      onClick={handleClick}
-      style={{ width: '100%', height: '100%' }}
-      mapStyle={OPENFREEMAP_STYLE}
-      interactiveLayerIds={[
-        'areas-layer',
-        'routes-layer',
-        'lines-layer',
-        'arcs-layer',
-      ]}
-    >
-      <NavigationControl position="top-left" />
-      <MapLayers />
-      {selectedElementId && <ElementPopup />}
-    </Map>
+    <div className="w-full h-full relative">
+      <div className="absolute top-2 right-2 z-10">
+        <AddPinDialog
+          onAdd={(data) => {
+            if (rightClickLngLat) {
+              // Add pin directly at right-click location
+              addElement({
+                id: `pin_${Date.now()}`,
+                type: 'pin',
+                title: data.title,
+                description: data.description,
+                icon: data.icon,
+                color: data.color,
+                coordinates: rightClickLngLat,
+                visible: true,
+                createdBy: 'user',
+              })
+              setShowPinDialog(false)
+              setRightClickLngLat(null)
+            } else {
+              setPendingPin(data)
+            }
+          }}
+          open={showPinDialog}
+          setOpen={setShowPinDialog}
+        />
+        {pendingPin && (
+          <div className="mt-2 p-2 bg-white border rounded shadow text-sm">
+            Click on the map to place your pin.
+          </div>
+        )}
+      </div>
+      <Map
+        ref={mapRef}
+        {...viewState}
+        onMove={handleMove}
+        onClick={handleClick}
+        onContextMenu={handleContextMenu}
+        style={{ width: '100%', height: '100%' }}
+        mapStyle={OPENFREEMAP_STYLE}
+        interactiveLayerIds={['areas-layer', 'routes-layer', 'lines-layer', 'arcs-layer']}
+      >
+        <NavigationControl position="top-left" />
+        <MapLayers />
+        {selectedElementId && <ElementPopup />}
+      </Map>
+    </div>
   )
 }

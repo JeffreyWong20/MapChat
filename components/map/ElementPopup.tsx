@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Popup } from 'react-map-gl/maplibre'
 import { useMapStore } from '@/stores/mapStore'
+import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { X, ExternalLink } from 'lucide-react'
@@ -38,7 +39,8 @@ function getElementCoordinates(
 }
 
 export function ElementPopup() {
-  const { elements, selectedElementId, setSelectedElement } = useMapStore()
+  const { elements, selectedElementId, setSelectedElement, removeElement, updateElement } =
+    useMapStore()
 
   const selectedElement = useMemo(
     () => elements.find((el) => el.id === selectedElementId),
@@ -48,6 +50,31 @@ export function ElementPopup() {
   if (!selectedElement) return null
 
   const coordinates = getElementCoordinates(selectedElement)
+
+  // Editable state for pins
+  const [editMode, setEditMode] = useState(false)
+  const [editTitle, setEditTitle] = useState(
+    selectedElement.type === 'pin' ? selectedElement.title : '',
+  )
+  const [editDescription, setEditDescription] = useState(
+    selectedElement.type === 'pin' ? selectedElement.description : '',
+  )
+  const [editIcon, setEditIcon] = useState(
+    selectedElement.type === 'pin' ? selectedElement.icon || '📍' : '',
+  )
+  const [editColor, setEditColor] = useState(
+    selectedElement.type === 'pin' ? selectedElement.color || '#FF6B6B' : '',
+  )
+
+  const handleSave = () => {
+    updateElement(selectedElement.id, {
+      title: editTitle,
+      description: editDescription,
+      icon: editIcon,
+      color: editColor,
+    })
+    setEditMode(false)
+  }
 
   return (
     <Popup
@@ -61,7 +88,16 @@ export function ElementPopup() {
     >
       <div className="bg-background rounded-lg shadow-lg border max-w-sm">
         <div className="flex items-start justify-between p-3 border-b">
-          <h3 className="font-semibold text-lg pr-2">{selectedElement.title}</h3>
+          {selectedElement.type === 'pin' && editMode ? (
+            <Input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="font-semibold text-lg pr-2"
+              maxLength={40}
+            />
+          ) : (
+            <h3 className="font-semibold text-lg pr-2">{selectedElement.title}</h3>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -74,7 +110,62 @@ export function ElementPopup() {
 
         <ScrollArea className="max-h-64">
           <div className="p-3 space-y-3">
-            <p className="text-sm text-muted-foreground">{selectedElement.description}</p>
+            {selectedElement.type === 'pin' && editMode ? (
+              <>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Description</label>
+                  <Input
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    maxLength={120}
+                  />
+                </div>
+                <div className="flex gap-2 items-center">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Emoji</label>
+                    <Input
+                      value={editIcon}
+                      onChange={(e) => setEditIcon(e.target.value)}
+                      maxLength={2}
+                      style={{ width: 48 }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Color</label>
+                    <Input
+                      type="color"
+                      value={editColor}
+                      onChange={(e) => setEditColor(e.target.value)}
+                      style={{ width: 48, padding: 0 }}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button size="sm" variant="outline" onClick={() => setEditMode(false)}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" variant="default" onClick={handleSave}>
+                    Save
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">{selectedElement.description}</p>
+                {selectedElement.type === 'pin' && (
+                  <div className="flex gap-2 items-center">
+                    <span className="text-2xl" title="Emoji">
+                      {selectedElement.icon || '📍'}
+                    </span>
+                    <span
+                      className="w-5 h-5 rounded-full border inline-block"
+                      style={{ background: selectedElement.color || '#FF6B6B' }}
+                      title="Color"
+                    />
+                  </div>
+                )}
+              </>
+            )}
 
             {selectedElement.article && (
               <div className="space-y-2">
@@ -108,6 +199,37 @@ export function ElementPopup() {
               <div className="text-xs text-muted-foreground">
                 <span>Date: {selectedElement.timeRange.start}</span>
                 {selectedElement.timeRange.end && <span> - {selectedElement.timeRange.end}</span>}
+              </div>
+            )}
+
+            {/* Edit/Delete buttons for pins */}
+            {selectedElement.type === 'pin' && !editMode && (
+              <div className="pt-2 border-t flex justify-end gap-2">
+                {selectedElement.createdBy === 'user' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditTitle(selectedElement.title)
+                      setEditDescription(selectedElement.description)
+                      setEditIcon(selectedElement.icon || '📍')
+                      setEditColor(selectedElement.color || '#FF6B6B')
+                      setEditMode(true)
+                    }}
+                  >
+                    Edit
+                  </Button>
+                )}
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    removeElement(selectedElement.id)
+                    setSelectedElement(null)
+                  }}
+                >
+                  Delete Pin
+                </Button>
               </div>
             )}
           </div>
