@@ -1,0 +1,158 @@
+# MapChat MVP Implementation Plan
+
+## Overview
+
+Build an AI-powered interactive map application ("MapChat") with:
+- **Left panel**: MapLibre-based 2D map with pins, areas, routes, and arcs
+- **Right panel**: AI chat interface (Gemini-powered, swappable)
+- **Bottom**: Timeline slider for temporal filtering
+- **Persistence**: Save/load state (localStorage initially, database-ready)
+
+## Architecture Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Framework | **Next.js 14 (App Router)** | Full-stack, API routes for secure LLM calls, team-friendly |
+| Map Library | MapLibre GL JS via react-map-gl | User specified, excellent React integration |
+| Basemap Tiles | OpenFreeMap | Free, no API key, zero setup |
+| State Management | Zustand | Minimal boilerplate, built-in persistence |
+| LLM Provider | Gemini with provider abstraction | User specified, swappable design |
+| Styling | Tailwind CSS + shadcn/ui | Rapid development, accessible components |
+| API Layer | Next.js API Routes | Secure API keys server-side, easy to extend |
+| Persistence | localStorage + API routes ready | Start simple, database-ready architecture |
+
+## Project Structure
+
+```
+mapchat/
+├── app/
+│   ├── layout.tsx              # Root layout
+│   ├── page.tsx                # Main app page
+│   ├── globals.css             # Global styles (Tailwind)
+│   └── api/
+│       ├── chat/
+│       │   └── route.ts        # POST /api/chat - LLM chat endpoint
+│       └── generate-elements/
+│           └── route.ts        # POST /api/generate-elements - structured output
+├── components/
+│   ├── chat/
+│   │   ├── ChatPanel.tsx       # Main chat container
+│   │   ├── MessageList.tsx     # Scrollable message list
+│   │   ├── MessageItem.tsx     # Individual message bubble
+│   │   └── ChatInput.tsx       # Input with send button
+│   ├── map/
+│   │   ├── MapContainer.tsx    # MapLibre wrapper (client component)
+│   │   ├── MapLayers.tsx       # Layer management
+│   │   ├── ElementPopup.tsx    # Popup article display
+│   │   └── index.ts
+│   ├── timeline/
+│   │   ├── TimelineSlider.tsx  # Main timeline component
+│   │   └── index.ts
+│   ├── layout/
+│   │   ├── AppLayout.tsx       # Split-pane layout
+│   │   └── Header.tsx          # App header/toolbar
+│   └── ui/                     # shadcn components
+├── lib/
+│   ├── llm/
+│   │   ├── types.ts            # LLM interfaces
+│   │   ├── gemini.ts           # Gemini provider (server-side)
+│   │   ├── prompts.ts          # System prompts
+│   │   └── schemas.ts          # JSON schemas for structured output
+│   └── utils/
+│       ├── id.ts               # ID generation
+│       └── dates.ts            # Date utilities
+├── stores/
+│   ├── mapStore.ts             # Map elements state
+│   ├── chatStore.ts            # Chat history state
+│   └── timelineStore.ts        # Timeline filter state
+├── types/
+│   ├── map-elements.ts         # MapElement types
+│   ├── chat.ts                 # Chat message types
+│   └── index.ts
+├── .env.local                  # GEMINI_API_KEY (server-side, secure)
+├── next.config.js
+├── tailwind.config.ts
+├── tsconfig.json
+└── package.json
+```
+
+## Key Data Types
+
+```typescript
+// Map Elements - all have: id, type, title, description, article?, timeRange, visible
+type MapElementType = 'pin' | 'area' | 'route' | 'arc' | 'line';
+
+interface PinElement { type: 'pin'; coordinates: [lng, lat]; }
+interface AreaElement { type: 'area'; coordinates: [lng, lat][][]; }  // Polygon
+interface RouteElement { type: 'route'; coordinates: [lng, lat][]; }  // LineString
+interface ArcElement { type: 'arc'; source: [lng, lat]; target: [lng, lat]; }
+
+interface TimeRange { start: string; end?: string; }  // ISO date strings
+
+interface Article { title: string; content: string; images?: []; sources?: []; }
+```
+
+## Implementation Phases
+
+### Phase 1: Project Foundation ✅
+- [x] Initialize Next.js 14 with App Router + TypeScript
+- [x] Configure Tailwind CSS + shadcn/ui
+- [x] Set up MapLibre with react-map-gl + OpenFreeMap tiles
+- [x] Create split-pane layout (react-resizable-panels)
+- [x] Implement Zustand stores (mapStore, chatStore, timelineStore)
+- [x] Basic chat UI (input + message list)
+
+### Phase 2: AI Integration (Server-Side) ✅
+- [x] Create `/api/chat` route for conversational responses
+- [x] Create `/api/generate-elements` route for structured map data
+- [x] Implement Gemini provider with JSON output (server-side)
+- [x] Create system prompts for map element generation
+- [x] Connect AI responses to mapStore
+
+### Phase 3: Map Elements ✅
+- [x] Implement pin markers layer (with click handling)
+- [x] Implement area polygons layer
+- [x] Implement route/line layers
+- [x] Implement arc layer (curved lines)
+- [x] Create ElementPopup for article display
+- [x] Add element selection highlighting
+
+### Phase 4: Timeline ✅
+- [x] Create timeline slider component (range selector)
+- [x] Connect timeline to map element visibility
+- [x] Auto-expand timeline for new elements
+
+### Phase 5: Persistence & Polish ✅
+- [x] Enable Zustand localStorage persistence
+- [x] Add save/load session controls in Header
+- [x] Export/import as JSON file
+- [x] Error handling (toast notifications via sonner)
+
+## API Routes
+
+### POST /api/chat
+```typescript
+// Request
+{ messages: ChatMessage[] }
+
+// Response
+{ content: string }
+```
+
+### POST /api/generate-elements
+```typescript
+// Request
+{ prompt: string, context?: string }
+
+// Response
+{ elements: MapElement[], summary: string, suggestedViewState?: {...} }
+```
+
+## Future Extensibility
+
+- **3D Support**: react-map-gl supports pitch/bearing; can add terrain layer
+- **LLM Swap**: Add new provider in `lib/llm/`, update API routes
+- **Basemap Swap**: Change tile URL in MapContainer
+- **Database**: Add Prisma + PostgreSQL when ready for user accounts
+- **Auth**: NextAuth.js integration
+- **Collaboration**: WebSockets via Socket.io or Pusher
