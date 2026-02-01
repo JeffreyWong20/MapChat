@@ -5,76 +5,13 @@ import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { useMapStore } from '@/stores/mapStore'
 import { useChatStore } from '@/stores/chatStore'
 import { useTimelineStore } from '@/stores/timelineStore'
-import { Download, Upload, Trash2, Map, PlayCircle, Columns2, MessageSquare } from 'lucide-react'
+import { Download, Upload, Trash2, Map, PlayCircle, Columns2, MessageSquare, LayoutGrid } from 'lucide-react'
 import { toast } from 'sonner'
+import { ExportDialog } from './ExportDialog'
+import { useState } from 'react'
 
-const DEMO_DATA = {
-  elements: [
-    {
-      id: 'ww2_1',
-      type: 'pin' as const,
-      title: 'Invasion of Poland',
-      description: 'The German invasion of Poland marked the start of World War II.',
-      coordinates: [19.0399, 51.1079] as [number, number],
-      visible: true,
-      color: '#e74c3c',
-      timeRange: { start: '1939-09-01' },
-    },
-    {
-      id: 'ww2_2',
-      type: 'pin' as const,
-      title: 'Attack on Pearl Harbor',
-      description: 'Surprise military strike by Japan on the US naval base in Hawaii.',
-      coordinates: [-157.9677, 21.3651] as [number, number],
-      visible: true,
-      color: '#e74c3c',
-      timeRange: { start: '1941-12-07' },
-    },
-    {
-      id: 'ww2_3',
-      type: 'pin' as const,
-      title: 'Battle of Stalingrad',
-      description: 'Major battle on the Eastern Front, a turning point in the war.',
-      coordinates: [44.5182, 48.7071] as [number, number],
-      visible: true,
-      color: '#e74c3c',
-      timeRange: { start: '1942-08-23', end: '1943-02-02' },
-    },
-    {
-      id: 'ww2_4',
-      type: 'pin' as const,
-      title: 'D-Day (Normandy Landings)',
-      description: 'Allied invasion of Normandy, the largest seaborne invasion in history.',
-      coordinates: [-0.6265, 49.3428] as [number, number],
-      visible: true,
-      color: '#3498db',
-      timeRange: { start: '1944-06-06' },
-    },
-    {
-      id: 'ww2_5',
-      type: 'pin' as const,
-      title: 'Atomic Bombing of Hiroshima',
-      description: 'The United States dropped an atomic bomb on Hiroshima, Japan.',
-      coordinates: [132.4599, 34.3853] as [number, number],
-      visible: true,
-      color: '#9b59b6',
-      timeRange: { start: '1945-08-06' },
-    },
-    {
-      id: 'ww2_6',
-      type: 'pin' as const,
-      title: 'VE Day - Victory in Europe',
-      description: 'Nazi Germany surrendered, ending World War II in Europe.',
-      coordinates: [13.405, 52.52] as [number, number],
-      visible: true,
-      color: '#2ecc71',
-      timeRange: { start: '1945-05-08' },
-    },
-  ],
-  viewState: { longitude: 20, latitude: 45, zoom: 2 },
-}
 
-export type ViewMode = 'split' | 'map' | 'chat'
+export type ViewMode = 'split' | 'map' | 'chat' | 'gallery'
 
 interface HeaderProps {
   viewMode: ViewMode
@@ -85,23 +22,10 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
   const { elements, setElements, clearElements, viewState, setViewState } = useMapStore()
   const { messages, setMessages, clearMessages } = useChatStore()
   const { reset: resetTimeline } = useTimelineStore()
+  const [showExportDialog, setShowExportDialog] = useState(false)
 
   const handleExport = () => {
-    const data = {
-      version: '1.0',
-      exportedAt: new Date().toISOString(),
-      elements,
-      messages,
-      viewState,
-    }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `mapchat-export-${new Date().toISOString().split('T')[0]}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.success('Session exported successfully')
+    setShowExportDialog(true)
   }
 
   const handleImport = () => {
@@ -115,9 +39,14 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
       try {
         const text = await file.text()
         const data = JSON.parse(text)
-        if (data.elements) setElements(data.elements)
-        if (data.messages) setMessages(data.messages)
-        if (data.viewState) setViewState(data.viewState)
+        // Handle both flat structure and nested data property
+        const elements = data.data?.elements || data.elements
+        const messages = data.data?.messages || data.messages
+        const viewState = data.data?.viewState || data.viewState
+
+        if (elements) setElements(elements)
+        if (messages) setMessages(messages)
+        if (viewState) setViewState(viewState)
         toast.success('Session imported successfully')
       } catch (error) {
         toast.error('Failed to import session')
@@ -133,11 +62,6 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
     toast.success('Session cleared')
   }
 
-  const handleLoadDemo = () => {
-    setElements(DEMO_DATA.elements)
-    setViewState(DEMO_DATA.viewState)
-    toast.success('Demo data loaded - try the timeline slider!')
-  }
 
   return (
     <header className="flex items-center justify-between px-4 py-2 border-b bg-background">
@@ -177,9 +101,13 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
           </Button>
         </div>
 
-        <Button variant="default" size="sm" onClick={handleLoadDemo}>
-          <PlayCircle className="h-4 w-4 mr-2" />
-          Load Demo
+        <Button
+          variant={viewMode === 'gallery' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => onViewModeChange(viewMode === 'gallery' ? 'split' : 'gallery')}
+        >
+          <LayoutGrid className="h-4 w-4 mr-2" />
+          Gallery
         </Button>
         <Button variant="outline" size="sm" onClick={handleExport}>
           <Download className="h-4 w-4 mr-2" />
@@ -195,6 +123,8 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
         </Button>
         <ThemeToggle />
       </div>
+
+      <ExportDialog open={showExportDialog} onOpenChange={setShowExportDialog} />
     </header>
   )
 }

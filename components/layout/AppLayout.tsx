@@ -4,6 +4,7 @@ import { ReactNode, useState } from 'react'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { Header, type ViewMode } from './Header'
 import { TimelineSlider } from '@/components/timeline'
+import { Gallery } from '@/components/gallery/Gallery'
 
 interface AppLayoutProps {
   mapPanel: ReactNode
@@ -17,7 +18,7 @@ export function AppLayout({ mapPanel, chatPanel }: AppLayoutProps) {
     <div className="flex flex-col h-screen">
       <Header viewMode={viewMode} onViewModeChange={setViewMode} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        {viewMode === 'split' && (
+        {(viewMode === 'split' || viewMode === 'gallery') && (
           <ResizablePanelGroup orientation="horizontal" className="flex-1">
             <ResizablePanel defaultSize={60} minSize={30}>
               <div className="h-full relative">
@@ -27,7 +28,11 @@ export function AppLayout({ mapPanel, chatPanel }: AppLayoutProps) {
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={40} minSize={25}>
-              {chatPanel}
+              {viewMode === 'gallery' ? (
+                <Gallery onSelect={() => setViewMode('split')} />
+              ) : (
+                chatPanel
+              )}
             </ResizablePanel>
           </ResizablePanelGroup>
         )}
