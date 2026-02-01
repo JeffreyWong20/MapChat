@@ -37,13 +37,36 @@ function createPinElement(data: PinData, coordinates: [number, number]): PinElem
 
 export function MapContainer() {
   const mapRef = useRef<MapRef>(null)
-  const { viewState, setViewState, selectedElementId, setSelectedElement, elements, addElement } =
-    useMapStore()
+  const {
+    viewState,
+    setViewState,
+    selectedElementId,
+    setSelectedElement,
+    elements,
+    addElement,
+    requestScreenshot,
+    setScreenshotResult
+  } = useMapStore()
   const { startDate, endDate, isEnabled } = useTimelineStore()
   const [pendingPin, setPendingPin] = useState<PinData | null>(null)
   const [showPinDialog, setShowPinDialog] = useState(false)
   const [rightClickLngLat, setRightClickLngLat] = useState<[number, number] | null>(null)
   const [isDark, setIsDark] = useState(false)
+
+  // Handle screenshot request
+  useEffect(() => {
+    if (requestScreenshot && mapRef.current) {
+      try {
+        const map = mapRef.current.getMap()
+        const canvas = map.getCanvas()
+        const dataUrl = canvas.toDataURL('image/png')
+        setScreenshotResult(dataUrl)
+      } catch (error) {
+        console.error('Failed to take screenshot:', error)
+        setScreenshotResult(null)
+      }
+    }
+  }, [requestScreenshot, setScreenshotResult])
 
   // Watch for theme changes
   useEffect(() => {
@@ -257,6 +280,7 @@ export function MapContainer() {
         mapStyle={isDark ? OPENFREEMAP_DARK_STYLE : OPENFREEMAP_LIGHT_STYLE}
         interactiveLayerIds={['areas-layer', 'routes-layer', 'lines-layer', 'arcs-layer']}
         maxPitch={85}
+        preserveDrawingBuffer={true}
       >
         <NavigationControl position="top-left" visualizePitch={true} showCompass={true} />
         <MapLayers />

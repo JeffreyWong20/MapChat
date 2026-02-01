@@ -6,6 +6,8 @@ interface MapState {
   elements: MapElement[]
   selectedElementId: string | null
   viewState: MapViewState
+  requestScreenshot: boolean
+  screenshotResult: string | null
 
   // Actions
   addElement: (element: MapElement) => void
@@ -16,6 +18,8 @@ interface MapState {
   setSelectedElement: (id: string | null) => void
   setViewState: (viewState: Partial<MapViewState>) => void
   setElements: (elements: MapElement[]) => void
+  setRequestScreenshot: (request: boolean) => void
+  setScreenshotResult: (result: string | null) => void
 }
 
 const defaultViewState: MapViewState = {
@@ -32,6 +36,8 @@ export const useMapStore = create<MapState>()(
       elements: [],
       selectedElementId: null,
       viewState: defaultViewState,
+      requestScreenshot: false,
+      screenshotResult: null,
 
       addElement: (element) =>
         set((state) => ({
@@ -77,9 +83,20 @@ export const useMapStore = create<MapState>()(
           elements,
           selectedElementId: null,
         }),
+
+      setRequestScreenshot: (request) =>
+        set({ requestScreenshot: request }),
+
+      setScreenshotResult: (result) =>
+        set({ screenshotResult: result }),
     }),
     {
       name: 'mapchat-map-store',
+      partialize: (state) => ({
+        elements: state.elements,
+        selectedElementId: state.selectedElementId,
+        viewState: state.viewState
+      }),
     },
   ),
 )
