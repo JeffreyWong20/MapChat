@@ -43,3 +43,39 @@ export async function GET() {
         return NextResponse.json({ error: 'Failed to fetch examples' }, { status: 500 })
     }
 }
+
+export async function POST(req: Request) {
+    try {
+        const body = await req.json()
+        const { title, description, data, thumbnail } = body
+
+        if (!title || !data) {
+            return NextResponse.json({ error: 'Title and data are required' }, { status: 400 })
+        }
+
+        const examplesDir = path.join(process.cwd(), 'data/examples')
+        if (!fs.existsSync(examplesDir)) {
+            fs.mkdirSync(examplesDir, { recursive: true })
+        }
+
+        // Generate a safe filename
+        const safeTitle = title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+        const filename = `${safeTitle}-${Date.now()}.json`
+        const filePath = path.join(examplesDir, filename)
+
+        const exampleData = {
+            id: filename.replace('.json', ''),
+            title,
+            description,
+            thumbnail,
+            data
+        }
+
+        fs.writeFileSync(filePath, JSON.stringify(exampleData, null, 2))
+
+        return NextResponse.json({ success: true, id: exampleData.id })
+    } catch (error) {
+        console.error('Error saving example:', error)
+        return NextResponse.json({ error: 'Failed to save example' }, { status: 500 })
+    }
+}

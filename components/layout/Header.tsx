@@ -5,9 +5,10 @@ import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { useMapStore } from '@/stores/mapStore'
 import { useChatStore } from '@/stores/chatStore'
 import { useTimelineStore } from '@/stores/timelineStore'
-import { Download, Upload, Trash2, Map, PlayCircle, Columns2, MessageSquare, LayoutGrid } from 'lucide-react'
+import { Download, Upload, Trash2, Map, PlayCircle, Columns2, MessageSquare, LayoutGrid, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { ExportDialog } from './ExportDialog'
+import { SaveToGalleryDialog } from '@/components/gallery/SaveToGalleryDialog'
 import { useState } from 'react'
 
 
@@ -23,6 +24,7 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
   const { messages, setMessages, clearMessages } = useChatStore()
   const { reset: resetTimeline } = useTimelineStore()
   const [showExportDialog, setShowExportDialog] = useState(false)
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
 
   const handleExport = () => {
     setShowExportDialog(true)
@@ -109,6 +111,10 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
           <LayoutGrid className="h-4 w-4 mr-2" />
           Gallery
         </Button>
+        <Button variant="outline" size="sm" onClick={() => setShowSaveDialog(true)}>
+          <Save className="h-4 w-4 mr-2" />
+          Save
+        </Button>
         <Button variant="outline" size="sm" onClick={handleExport}>
           <Download className="h-4 w-4 mr-2" />
           Export
@@ -125,6 +131,7 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
       </div>
 
       <ExportDialog open={showExportDialog} onOpenChange={setShowExportDialog} />
+      <SaveToGalleryDialog open={showSaveDialog} onOpenChange={setShowSaveDialog} />
     </header>
   )
 }

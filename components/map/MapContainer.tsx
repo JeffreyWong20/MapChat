@@ -63,15 +63,30 @@ export function MapContainer() {
   // Handle screenshot request
   useEffect(() => {
     if (requestScreenshot && mapRef.current) {
-      try {
-        const map = mapRef.current.getMap()
-        const canvas = map.getCanvas()
-        const dataUrl = canvas.toDataURL('image/png')
-        setScreenshotResult(dataUrl)
-      } catch (error) {
-        console.error('Failed to take screenshot:', error)
-        setScreenshotResult(null)
+      const map = mapRef.current.getMap()
+
+      const capture = () => {
+        try {
+          if (!map.getCanvas()) {
+            console.error('Canvas not found')
+            setScreenshotResult(null)
+            return
+          }
+          const dataUrl = map.getCanvas().toDataURL('image/png')
+          setScreenshotResult(dataUrl)
+        } catch (error) {
+          console.error('Failed to take screenshot:', error)
+          setScreenshotResult(null)
+        }
       }
+
+      // Force a redraw to ensure we have fresh content and avoid grey/blank canvas
+      map.triggerRepaint()
+
+      // Wait for the map to become idle after the repaint
+      map.once('idle', () => {
+        capture()
+      })
     }
   }, [requestScreenshot, setScreenshotResult])
 
