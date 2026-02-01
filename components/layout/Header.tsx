@@ -1,6 +1,7 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { useMapStore } from '@/stores/mapStore'
 import { useChatStore } from '@/stores/chatStore'
 import { useTimelineStore } from '@/stores/timelineStore'
@@ -190,6 +191,7 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
           <Trash2 className="h-4 w-4 mr-2" />
           Clear
         </Button>
+        <ThemeToggle />
       </div>
     </header>
   )
