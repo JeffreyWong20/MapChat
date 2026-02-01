@@ -191,6 +191,7 @@ export function ChatPanel() {
               visible: true,
               timeRange: props.timeRange,
               article: props.article,
+              createdBy: 'llm',
             } as PinElement
           } else if (elementType === 'area') {
             element = {
@@ -203,6 +204,7 @@ export function ChatPanel() {
               visible: true,
               timeRange: props.timeRange,
               article: props.article,
+              createdBy: 'llm',
             } as AreaElement
           } else if (elementType === 'route') {
             element = {
@@ -215,6 +217,7 @@ export function ChatPanel() {
               visible: true,
               timeRange: props.timeRange,
               article: props.article,
+              createdBy: 'llm',
             } as RouteElement
           } else if (elementType === 'line') {
             element = {
@@ -227,6 +230,7 @@ export function ChatPanel() {
               visible: true,
               timeRange: props.timeRange,
               article: props.article,
+              createdBy: 'llm',
             } as LineElement
           } else if (elementType === 'arc') {
             element = {
@@ -240,6 +244,7 @@ export function ChatPanel() {
               visible: true,
               timeRange: props.timeRange,
               article: props.article,
+              createdBy: 'llm',
             } as ArcElement
           } else {
             console.error('Unknown element type:', elementType)

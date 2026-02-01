@@ -21,6 +21,7 @@ interface BaseMapElement {
   timeRange?: TimeRange
   visible: boolean
   color?: string
+  createdBy?: 'user' | 'llm'
 }
 
 export interface PinElement extends BaseMapElement {

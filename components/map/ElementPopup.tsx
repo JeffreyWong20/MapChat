@@ -1,53 +1,77 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Popup } from 'react-map-gl/maplibre'
 import { useMapStore } from '@/stores/mapStore'
+import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { X, ExternalLink } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
-import type { PinElement, ArcElement, AreaElement, RouteElement, LineElement } from '@/types'
+import type { MapElement } from '@/types'
 
-function getElementCoordinates(
-  element: PinElement | AreaElement | RouteElement | LineElement | ArcElement,
-): [number, number] {
+function getElementCoordinates(element: MapElement): [number, number] {
   switch (element.type) {
     case 'pin':
       return element.coordinates
     case 'arc':
-      // Return midpoint of arc
       return [
         (element.source[0] + element.target[0]) / 2,
         (element.source[1] + element.target[1]) / 2,
       ]
-    case 'area':
-      // Return centroid of first ring
+    case 'area': {
       const ring = element.coordinates[0]
       const sumLng = ring.reduce((acc, coord) => acc + coord[0], 0)
       const sumLat = ring.reduce((acc, coord) => acc + coord[1], 0)
       return [sumLng / ring.length, sumLat / ring.length]
+    }
     case 'route':
-    case 'line':
-      // Return midpoint of line
+    case 'line': {
       const midIndex = Math.floor(element.coordinates.length / 2)
       return element.coordinates[midIndex]
+    }
     default:
       return [0, 0]
   }
 }
 
 export function ElementPopup() {
-  const { elements, selectedElementId, setSelectedElement } = useMapStore()
+  const { elements, selectedElementId, setSelectedElement, removeElement, updateElement } =
+    useMapStore()
 
   const selectedElement = useMemo(
     () => elements.find((el) => el.id === selectedElementId),
     [elements, selectedElementId],
   )
 
+  const [editMode, setEditMode] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editIcon, setEditIcon] = useState('📍')
+  const [editColor, setEditColor] = useState('#FF6B6B')
+
   if (!selectedElement) return null
 
   const coordinates = getElementCoordinates(selectedElement)
+
+  const handleSave = () => {
+    updateElement(selectedElement.id, {
+      title: editTitle,
+      description: editDescription,
+      icon: editIcon,
+      color: editColor,
+    })
+    setEditMode(false)
+  }
+
+  const handleStartEdit = () => {
+    if (selectedElement.type !== 'pin') return
+    setEditTitle(selectedElement.title)
+    setEditDescription(selectedElement.description)
+    setEditIcon(selectedElement.icon || '📍')
+    setEditColor(selectedElement.color || '#FF6B6B')
+    setEditMode(true)
+  }
 
   return (
     <Popup
@@ -61,7 +85,16 @@ export function ElementPopup() {
     >
       <div className="bg-background rounded-lg shadow-lg border max-w-sm">
         <div className="flex items-start justify-between p-3 border-b">
-          <h3 className="font-semibold text-lg pr-2">{selectedElement.title}</h3>
+          {selectedElement.type === 'pin' && editMode ? (
+            <Input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="font-semibold text-lg pr-2"
+              maxLength={40}
+            />
+          ) : (
+            <h3 className="font-semibold text-lg pr-2">{selectedElement.title}</h3>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -74,7 +107,62 @@ export function ElementPopup() {
 
         <ScrollArea className="max-h-64">
           <div className="p-3 space-y-3">
-            <p className="text-sm text-muted-foreground">{selectedElement.description}</p>
+            {selectedElement.type === 'pin' && editMode ? (
+              <>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Description</label>
+                  <Input
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    maxLength={120}
+                  />
+                </div>
+                <div className="flex gap-2 items-center">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Emoji</label>
+                    <Input
+                      value={editIcon}
+                      onChange={(e) => setEditIcon(e.target.value)}
+                      maxLength={2}
+                      style={{ width: 48 }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Color</label>
+                    <Input
+                      type="color"
+                      value={editColor}
+                      onChange={(e) => setEditColor(e.target.value)}
+                      style={{ width: 48, padding: 0 }}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button size="sm" variant="outline" onClick={() => setEditMode(false)}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" variant="default" onClick={handleSave}>
+                    Save
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">{selectedElement.description}</p>
+                {selectedElement.type === 'pin' && (
+                  <div className="flex gap-2 items-center">
+                    <span className="text-2xl" title="Emoji">
+                      {selectedElement.icon || '📍'}
+                    </span>
+                    <span
+                      className="w-5 h-5 rounded-full border inline-block"
+                      style={{ background: selectedElement.color || '#FF6B6B' }}
+                      title="Color"
+                    />
+                  </div>
+                )}
+              </>
+            )}
 
             {selectedElement.article && (
               <div className="space-y-2">
@@ -108,6 +196,26 @@ export function ElementPopup() {
               <div className="text-xs text-muted-foreground">
                 <span>Date: {selectedElement.timeRange.start}</span>
                 {selectedElement.timeRange.end && <span> - {selectedElement.timeRange.end}</span>}
+              </div>
+            )}
+
+            {selectedElement.type === 'pin' && !editMode && (
+              <div className="pt-2 border-t flex justify-end gap-2">
+                {selectedElement.createdBy === 'user' && (
+                  <Button variant="outline" size="sm" onClick={handleStartEdit}>
+                    Edit
+                  </Button>
+                )}
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    removeElement(selectedElement.id)
+                    setSelectedElement(null)
+                  }}
+                >
+                  Delete Pin
+                </Button>
               </div>
             )}
           </div>
