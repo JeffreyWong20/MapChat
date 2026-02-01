@@ -9,6 +9,12 @@ interface MapState {
   requestScreenshot: boolean
   screenshotResult: string | null
 
+  // History
+  past: MapElement[][]
+  future: MapElement[][]
+  undo: () => void
+  redo: () => void
+
   // Actions
   addElement: (element: MapElement) => void
   addElements: (elements: MapElement[]) => void
@@ -39,18 +45,56 @@ export const useMapStore = create<MapState>()(
       requestScreenshot: false,
       screenshotResult: null,
 
+      // History state
+      past: [],
+      future: [],
+
+      undo: () =>
+        set((state) => {
+          if (state.past.length === 0) return state
+
+          const previous = state.past[state.past.length - 1]
+          const newPast = state.past.slice(0, -1)
+
+          return {
+            past: newPast,
+            future: [state.elements, ...state.future],
+            elements: previous,
+          }
+        }),
+
+      redo: () =>
+        set((state) => {
+          if (state.future.length === 0) return state
+
+          const next = state.future[0]
+          const newFuture = state.future.slice(1)
+
+          return {
+            past: [...state.past, state.elements],
+            future: newFuture,
+            elements: next,
+          }
+        }),
+
       addElement: (element) =>
         set((state) => ({
+          past: [...state.past, state.elements],
+          future: [],
           elements: [...state.elements, element],
         })),
 
       addElements: (elements) =>
         set((state) => ({
+          past: [...state.past, state.elements],
+          future: [],
           elements: [...state.elements, ...elements],
         })),
 
       updateElement: (id, updates) =>
         set((state) => ({
+          past: [...state.past, state.elements],
+          future: [],
           elements: state.elements.map((el) =>
             el.id === id ? ({ ...el, ...updates } as MapElement) : el,
           ),
@@ -58,15 +102,19 @@ export const useMapStore = create<MapState>()(
 
       removeElement: (id) =>
         set((state) => ({
+          past: [...state.past, state.elements],
+          future: [],
           elements: state.elements.filter((el) => el.id !== id),
           selectedElementId: state.selectedElementId === id ? null : state.selectedElementId,
         })),
 
       clearElements: () =>
-        set({
+        set((state) => ({
+          past: [...state.past, state.elements],
+          future: [],
           elements: [],
           selectedElementId: null,
-        }),
+        })),
 
       setSelectedElement: (id) =>
         set({
@@ -79,10 +127,12 @@ export const useMapStore = create<MapState>()(
         })),
 
       setElements: (elements) =>
-        set({
+        set((state) => ({
+          past: [...state.past, state.elements],
+          future: [],
           elements,
           selectedElementId: null,
-        }),
+        })),
 
       setRequestScreenshot: (request) =>
         set({ requestScreenshot: request }),
@@ -96,6 +146,7 @@ export const useMapStore = create<MapState>()(
         elements: state.elements,
         selectedElementId: state.selectedElementId,
         viewState: state.viewState
+        // Don't persist history
       }),
     },
   ),

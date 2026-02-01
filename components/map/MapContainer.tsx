@@ -10,6 +10,8 @@ import { MapLayers } from './MapLayers'
 import { ElementPopup } from './ElementPopup'
 import { AddPinDialog } from './AddPinDialog'
 import type { PinElement } from '@/types'
+import { Button } from '@/components/ui/button'
+import { Undo2, Redo2 } from 'lucide-react'
 
 const OPENFREEMAP_LIGHT_STYLE = 'https://tiles.openfreemap.org/styles/liberty'
 const OPENFREEMAP_DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark'
@@ -35,6 +37,7 @@ function createPinElement(data: PinData, coordinates: [number, number]): PinElem
   }
 }
 
+
 export function MapContainer() {
   const mapRef = useRef<MapRef>(null)
   const {
@@ -45,7 +48,11 @@ export function MapContainer() {
     elements,
     addElement,
     requestScreenshot,
-    setScreenshotResult
+    setScreenshotResult,
+    undo,
+    redo,
+    past,
+    future
   } = useMapStore()
   const { startDate, endDate, isEnabled } = useTimelineStore()
   const [pendingPin, setPendingPin] = useState<PinData | null>(null)
@@ -239,7 +246,30 @@ export function MapContainer() {
 
   return (
     <div className="w-full h-full relative">
-      <div className="absolute top-2 right-2 z-10">
+      <div className="absolute top-2 right-2 z-10 flex flex-col gap-2 items-end">
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-9 w-9 bg-background/80 backdrop-blur-sm shadow-sm"
+            onClick={undo}
+            disabled={past.length === 0}
+            title="Undo"
+          >
+            <Undo2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-9 w-9 bg-background/80 backdrop-blur-sm shadow-sm"
+            onClick={redo}
+            disabled={future.length === 0}
+            title="Redo"
+          >
+            <Redo2 className="h-4 w-4" />
+          </Button>
+        </div>
+
         <AddPinDialog
           onAdd={(data) => {
             if (rightClickLngLat) {
@@ -280,6 +310,7 @@ export function MapContainer() {
         mapStyle={isDark ? OPENFREEMAP_DARK_STYLE : OPENFREEMAP_LIGHT_STYLE}
         interactiveLayerIds={['areas-layer', 'routes-layer', 'lines-layer', 'arcs-layer']}
         maxPitch={85}
+        // @ts-ignore
         preserveDrawingBuffer={true}
       >
         <NavigationControl position="top-left" visualizePitch={true} showCompass={true} />
