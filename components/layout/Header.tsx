@@ -82,7 +82,7 @@ interface HeaderProps {
 }
 
 export function Header({ viewMode, onViewModeChange }: HeaderProps) {
-  const { elements, setElements, clearElements, setViewState } = useMapStore()
+  const { elements, setElements, clearElements, viewState, setViewState } = useMapStore()
   const { messages, setMessages, clearMessages } = useChatStore()
   const { reset: resetTimeline } = useTimelineStore()
 
@@ -92,6 +92,7 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
       exportedAt: new Date().toISOString(),
       elements,
       messages,
+      viewState,
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -116,6 +117,7 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
         const data = JSON.parse(text)
         if (data.elements) setElements(data.elements)
         if (data.messages) setMessages(data.messages)
+        if (data.viewState) setViewState(data.viewState)
         toast.success('Session imported successfully')
       } catch (error) {
         toast.error('Failed to import session')

@@ -256,8 +256,9 @@ export function MapContainer() {
         style={{ width: '100%', height: '100%' }}
         mapStyle={isDark ? OPENFREEMAP_DARK_STYLE : OPENFREEMAP_LIGHT_STYLE}
         interactiveLayerIds={['areas-layer', 'routes-layer', 'lines-layer', 'arcs-layer']}
+        maxPitch={85}
       >
-        <NavigationControl position="top-left" />
+        <NavigationControl position="top-left" visualizePitch={true} showCompass={true} />
         <MapLayers />
         {selectedElementId && <ElementPopup />}
       </Map>
