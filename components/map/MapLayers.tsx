@@ -38,7 +38,7 @@ function generateArcCoordinates(
 type WithRange<T> = T & { inRange: boolean }
 
 export function MapLayers() {
-  const { elements, selectedElementId, setSelectedElement } = useMapStore()
+  const { elements, selectedElementId, setSelectedElement, updateElement } = useMapStore()
   const { startDate, endDate, isEnabled } = useTimelineStore()
 
   const visibleElements = useMemo(() => {
@@ -204,12 +204,17 @@ export function MapLayers() {
       </Source>
 
       {/* Pins - HTML Markers for color emoji support */}
+      {/* Pins - HTML Markers for color emoji support */}
       {pins.map((pin) => (
         <Marker
           key={pin.id}
           longitude={pin.coordinates[0]}
           latitude={pin.coordinates[1]}
           anchor="center"
+          draggable
+          onDragEnd={(e) => {
+            updateElement(pin.id, { coordinates: [e.lngLat.lng, e.lngLat.lat] })
+          }}
         >
           <div
             className="flex flex-col items-center cursor-pointer"
