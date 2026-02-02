@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenerativeAI, type Part } from '@google/generative-ai'
 import type { LLMMessage } from './types'
 import { SYSTEM_PROMPT } from './prompts'
 import {
@@ -90,9 +90,7 @@ When adding elements, generate unique IDs like "pin_1", "area_1", etc. Check the
     console.log(`--- Loop iteration ${i + 1}: ${functionCalls.length} tool call(s) ---`)
 
     // Process each function call and build response parts
-    const functionResponses: Array<{
-      functionResponse: { name: string; response: unknown }
-    }> = []
+    const functionResponses: Part[] = []
 
     for (const fc of functionCalls) {
       const name = fc.name
@@ -110,7 +108,7 @@ When adding elements, generate unique IDs like "pin_1", "area_1", etc. Check the
         }
 
         functionResponses.push({
-          functionResponse: { name, response: dataResult },
+          functionResponse: { name, response: dataResult as object },
         })
       } else if (actionToolSet.has(name)) {
         // ── Action tool: accumulate for client, stub success to LLM ──
