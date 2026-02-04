@@ -259,69 +259,6 @@ export function ChatPanel() {
 
   const needsApiKey = hasServerKey === false && !apiKey
 
-  if (hasServerKey === null) {
-    return (
-      <div className="flex flex-col h-full bg-background">
-        <div className="px-4 py-3 border-b">
-          <h2 className="font-semibold">Chat</h2>
-          <p className="text-xs text-muted-foreground">{elements.length} elements on map</p>
-        </div>
-        <div className="flex-1" />
-      </div>
-    )
-  }
-
-  if (needsApiKey) {
-    return (
-      <div className="flex flex-col h-full bg-background">
-        <div className="px-4 py-3 border-b">
-          <h2 className="font-semibold">Chat</h2>
-          <p className="text-xs text-muted-foreground">{elements.length} elements on map</p>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="w-full max-w-sm space-y-4 text-center">
-            <KeyRound className="h-10 w-10 mx-auto text-muted-foreground" />
-            <div>
-              <h3 className="font-semibold text-lg">Enter your Gemini API Key</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                This app requires a Google Gemini API key to work. Your key is only stored in memory and never saved.
-              </p>
-            </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                const trimmed = apiKeyInput.trim()
-                if (trimmed) setApiKey(trimmed)
-              }}
-              className="flex flex-col gap-2"
-            >
-              <Input
-                type="password"
-                placeholder="AIzaSy..."
-                value={apiKeyInput}
-                onChange={(e) => setApiKeyInput(e.target.value)}
-              />
-              <Button type="submit" disabled={!apiKeyInput.trim()}>
-                Start Chatting
-              </Button>
-            </form>
-            <p className="text-xs text-muted-foreground">
-              Get a key at{' '}
-              <a
-                href="https://aistudio.google.com/apikey"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                aistudio.google.com
-              </a>
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="px-4 py-3 border-b">
@@ -329,7 +266,46 @@ export function ChatPanel() {
         <p className="text-xs text-muted-foreground">{elements.length} elements on map</p>
       </div>
       <MessageList />
-      <ChatInput onSend={handleSend} />
+      {needsApiKey ? (
+        <div className="border-t p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-muted-foreground shrink-0" />
+            <p className="text-sm text-muted-foreground">
+              Enter a{' '}
+              <a
+                href="https://aistudio.google.com/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                Gemini API key
+              </a>
+              {' '}to chat
+            </p>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              const trimmed = apiKeyInput.trim()
+              if (trimmed) setApiKey(trimmed)
+            }}
+            className="flex gap-2"
+          >
+            <Input
+              type="password"
+              placeholder="AIzaSy..."
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              className="flex-1"
+            />
+            <Button type="submit" disabled={!apiKeyInput.trim()} size="sm">
+              Connect
+            </Button>
+          </form>
+        </div>
+      ) : (
+        <ChatInput onSend={handleSend} />
+      )}
     </div>
   )
 }
